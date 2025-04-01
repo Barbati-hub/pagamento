@@ -1,42 +1,49 @@
 import { Router } from 'express';
-import { MercadoPagoConfig, Payment } from 'mercadopago';
-import { config } from '../config';
+import QRCode from 'qrcode';
 
 const router = Router();
-
-// Configurar o Mercado Pago
-const mercadopago = new MercadoPagoConfig({ accessToken: config.mercadoPagoAccessToken });
-const payment = new Payment(mercadopago);
 
 router.post('/pix', async (req, res) => {
   try {
     const { valor, descricao } = req.body;
 
-    const result = await payment.create({
-      body: {
-        transaction_amount: valor,
-        description: descricao,
-        payment_method_id: 'pix',
-        payer: {
-          email: 'test@test.com',
-        }
-      }
-    });
-
-    if (!result.point_of_interaction?.transaction_data?.qr_code) {
-      throw new Error('Dados do PIX não gerados corretamente');
+    // Validar os dados recebidos
+    if (!valor || valor <= 0) {
+      return res.status(400).json({ error: 'Valor inválido' });
     }
 
+    if (!descricao) {
+      return res.status(400).json({ error: 'Descrição é obrigatória' });
+    }
+
+    // Criar texto do PIX com os dados do teste
+    const pixText = `
+      Telefone: 69984528189
+      Nome: Douglas Alves Barbati
+      Valor: R$ ${valor.toFixed(2)}
+      Descrição: ${descricao}
+      (TESTE - NÃO É UM PIX REAL)
+    `.trim();
+
+    // Gerar QR Code
+    const qrcode = await QRCode.toDataURL(pixText);
+
     const pixData = {
-      qrcode: result.point_of_interaction.transaction_data.qr_code,
-      qrcode_base64: result.point_of_interaction.transaction_data.qr_code_base64 || '',
-      copy_paste: result.point_of_interaction.transaction_data.qr_code
+      qrcode: pixText,
+      qrcode_base64: qrcode,
+      copy_paste: pixText
     };
 
+    console.log('PIX gerado para teste:', { valor, descricao });
     res.json(pixData);
   } catch (error) {
     console.error('Erro ao gerar PIX:', error);
-    res.status(500).json({ error: 'Erro ao gerar PIX' });
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    res.status(500).json({ 
+      error: 'Erro ao gerar PIX',
+      details: errorMessage,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 

@@ -9,13 +9,25 @@ import { PaymentDialog } from './PaymentDialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
+import { useToast } from '@/components/ui/use-toast';
 
 export function Cart() {
   const { items, removeItem, updateQuantity, clearCart, total } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const { toast } = useToast();
 
   const itemCount = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  const handlePaymentSuccess = () => {
+    clearCart();
+    setShowPayment(false);
+    toast({
+      title: "Pagamento realizado com sucesso!",
+      description: "Seu pedido foi confirmado e será enviado em breve.",
+      duration: 5000,
+    });
+  };
 
   return (
     <>
@@ -37,91 +49,79 @@ export function Cart() {
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[425px] p-0 bg-gray-50/95 backdrop-blur-sm border-0">
-          <DialogHeader className="px-6 py-4 bg-orange-500 text-white">
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <ShoppingCart className="h-5 w-5" />
-              Carrinho de Compras
-            </DialogTitle>
+        <DialogContent className="sm:max-w-[500px] p-0 bg-gray-50/95 backdrop-blur-sm border-0">
+          <DialogHeader className="px-6 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+            <DialogTitle className="text-lg font-bold">Carrinho de Compras</DialogTitle>
           </DialogHeader>
 
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-6">
-              <div className="w-16 h-16 rounded-full bg-white/50 flex items-center justify-center mb-4">
-                <ShoppingCart className="h-8 w-8 text-gray-400" />
+            <div className="p-6 text-center space-y-4">
+              <div className="flex justify-center">
+                <ShoppingCart className="h-12 w-12 text-gray-400" />
               </div>
-              <p className="text-gray-700 text-center">Seu carrinho está vazio</p>
-              <p className="text-sm text-gray-500 text-center mt-1">
-                Adicione produtos para começar suas compras
-              </p>
+              <div className="space-y-2">
+                <h3 className="font-medium text-gray-900">Seu carrinho está vazio</h3>
+                <p className="text-sm text-gray-500">
+                  Adicione produtos ao seu carrinho para continuar comprando
+                </p>
+              </div>
             </div>
           ) : (
             <>
-              <ScrollArea className="max-h-[60vh]">
-                <div className="px-6 py-4 space-y-4">
+              <ScrollArea className="max-h-[60vh] p-6">
+                <div className="space-y-4">
                   {items.map((item) => (
-                    <div 
-                      key={item.product.id} 
-                      className="flex gap-4 p-4 rounded-lg bg-white/80 hover:bg-white/90 transition-colors shadow-sm"
-                    >
-                      {/* Imagem do Produto */}
-                      <div className="w-20 h-20 rounded-md bg-white p-2 shadow-sm">
+                    <div key={item.product.id} className="flex items-center gap-4 p-3 rounded-lg bg-white/60 backdrop-blur-sm shadow-sm">
+                      <div className="w-16 h-16 relative rounded-md bg-white p-2 shadow-sm">
                         <Image
                           src={item.product.imagem || ''}
                           alt={item.product.nome}
-                          width={80}
-                          height={80}
-                          className="w-full h-full object-contain"
+                          fill
+                          className="object-contain p-1"
                         />
                       </div>
-
                       <div className="flex-1 min-w-0">
-                        <div className="flex justify-between gap-2">
-                          <h4 className="font-medium text-sm text-gray-900 truncate">
-                            {item.product.nome}
-                          </h4>
+                        <h4 className="font-medium text-sm text-gray-900 truncate">
+                          {item.product.nome}
+                        </h4>
+                        <div className="text-sm text-gray-500">
+                          R$ {item.product.preco.toFixed(2)}
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex items-center gap-1 bg-gray-100 rounded-md">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:text-orange-500"
+                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center font-medium text-gray-900">
+                              {item.quantity}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:text-orange-500"
+                              onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            className="h-8 w-8 hover:text-red-500"
                             onClick={() => removeItem(item.product.id)}
+                            title="Remover item"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        
-                        <div className="mt-1 flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900">
-                            R$ {item.product.preco.toFixed(2)}
-                          </span>
-                          
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-6 w-6 rounded-full bg-white"
-                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                              disabled={item.quantity <= 1}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-8 text-center text-sm">
-                              {item.quantity}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-6 w-6 rounded-full bg-white"
-                              onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="mt-1 text-xs text-gray-500">
-                          Subtotal: R$ {(item.product.preco * item.quantity).toFixed(2)}
-                        </div>
+                      </div>
+                      <div className="text-sm font-medium text-gray-900">
+                        R$ {(item.quantity * item.product.preco).toFixed(2)}
                       </div>
                     </div>
                   ))}
@@ -145,7 +145,7 @@ export function Cart() {
                     Limpar Carrinho
                   </Button>
                   <Button
-                    className="bg-orange-500 hover:bg-orange-600 text-white font-medium"
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-medium shadow-lg"
                     onClick={() => {
                       setShowPayment(true);
                       setIsOpen(false);
@@ -169,6 +169,7 @@ export function Cart() {
         onOpenChange={setShowPayment}
         total={total}
         items={items}
+        onPaymentSuccess={handlePaymentSuccess}
       />
     </>
   );

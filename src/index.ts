@@ -9,13 +9,8 @@ dotenv.config()
 
 const app = express()
 
-// Configuração do CORS mais explícita
-app.use(cors({
-  origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}))
+// Configuração do CORS para desenvolvimento
+app.use(cors())
 
 app.use(express.json())
 

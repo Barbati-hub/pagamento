@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { QrCode, CreditCard, Copy, Check } from 'lucide-react';
 import { CartItem } from '@/types';
 import Image from 'next/image';
-import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
 
 interface PaymentDialogProps {
@@ -14,6 +13,7 @@ interface PaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   total: number;
   items: CartItem[];
+  onPaymentSuccess?: () => void;
 }
 
 interface PixResponse {
@@ -22,23 +22,73 @@ interface PixResponse {
   copy_paste: string;
 }
 
-export function PaymentDialog({ open, onOpenChange, total, items }: PaymentDialogProps) {
+interface CardFormData {
+  numero: string;
+  nome: string;
+  validade: string;
+  cvv: string;
+}
+
+export function PaymentDialog({ open, onOpenChange, total, items, onPaymentSuccess }: PaymentDialogProps) {
   const [paymentStep, setPaymentStep] = useState<'method' | 'pix' | 'card'>('method');
   const [pixData, setPixData] = useState<PixResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [cardData, setCardData] = useState<CardFormData>({
+    numero: '',
+    nome: '',
+    validade: '',
+    cvv: ''
+  });
+  const [cardError, setCardError] = useState('');
 
   const generatePix = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:3000/pagamentos/pix', {
-        valor: 0.01, // 1 centavo
-        descricao: 'Teste de Pagamento'
+      const response = await axios.post('http://localhost:3333/pagamentos/pix', {
+        valor: total,
+        descricao: `Pedido com ${items.length} ${items.length === 1 ? 'item' : 'itens'}`
       });
       setPixData(response.data);
       setPaymentStep('pix');
     } catch (error) {
       console.error('Erro ao gerar PIX:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setCardError('');
+
+    try {
+      // Validações básicas
+      if (!cardData.numero || !cardData.nome || !cardData.validade || !cardData.cvv) {
+        throw new Error('Preencha todos os campos do cartão');
+      }
+
+      if (cardData.numero.length < 16) {
+        throw new Error('Número do cartão inválido');
+      }
+
+      if (cardData.cvv.length < 3) {
+        throw new Error('CVV inválido');
+      }
+
+      // Simular processamento do pagamento
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Aqui você implementaria a integração real com o gateway de pagamento
+      
+      if (onPaymentSuccess) {
+        onPaymentSuccess();
+      }
+      
+      onOpenChange(false);
+    } catch (error) {
+      setCardError(error instanceof Error ? error.message : 'Erro ao processar pagamento');
     } finally {
       setLoading(false);
     }
@@ -142,22 +192,26 @@ export function PaymentDialog({ open, onOpenChange, total, items }: PaymentDialo
                 </div>
               </div>
             </>
-          ) : paymentStep === 'pix' && pixData ? (
+          ) : paymentStep === 'pix' ? (
             <div className="flex flex-col items-center space-y-6">
               <div className="bg-white p-6 rounded-lg shadow-sm">
-                <QRCodeSVG value={pixData.qrcode} size={200} />
+                <img 
+                  src={pixData?.qrcode_base64} 
+                  alt="QR Code PIX"
+                  className="w-[200px] h-[200px]"
+                />
               </div>
               
               <div className="space-y-2 w-full">
                 <p className="text-sm text-gray-500 text-center">
-                  Escaneie o QR Code acima ou copie o código PIX abaixo
+                  Escaneie o QR Code acima ou copie os dados abaixo
                 </p>
                 
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     className="flex-1 bg-white"
-                    onClick={() => copyToClipboard(pixData.copy_paste)}
+                    onClick={() => pixData && copyToClipboard(pixData.copy_paste)}
                   >
                     {copied ? (
                       <>
@@ -167,10 +221,16 @@ export function PaymentDialog({ open, onOpenChange, total, items }: PaymentDialo
                     ) : (
                       <>
                         <Copy className="h-4 w-4 mr-2" />
-                        Copiar código PIX
+                        Copiar dados
                       </>
                     )}
                   </Button>
+                </div>
+
+                <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                  <pre className="text-xs text-gray-600 whitespace-pre-wrap break-all">
+                    {pixData?.copy_paste}
+                  </pre>
                 </div>
               </div>
 
@@ -187,7 +247,109 @@ export function PaymentDialog({ open, onOpenChange, total, items }: PaymentDialo
                 Escolher outro método de pagamento
               </Button>
             </div>
-          ) : null}
+          ) : (
+            <form onSubmit={handleCardSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="numero" className="text-sm font-medium text-gray-900">
+                    Número do Cartão
+                  </label>
+                  <input
+                    type="text"
+                    id="numero"
+                    maxLength={16}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    value={cardData.numero}
+                    onChange={(e) => setCardData({ ...cardData, numero: e.target.value.replace(/\D/g, '') })}
+                    placeholder="1234 5678 9012 3456"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="nome" className="text-sm font-medium text-gray-900">
+                    Nome no Cartão
+                  </label>
+                  <input
+                    type="text"
+                    id="nome"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    value={cardData.nome}
+                    onChange={(e) => setCardData({ ...cardData, nome: e.target.value })}
+                    placeholder="NOME COMO ESTÁ NO CARTÃO"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label htmlFor="validade" className="text-sm font-medium text-gray-900">
+                      Validade
+                    </label>
+                    <input
+                      type="text"
+                      id="validade"
+                      maxLength={5}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      value={cardData.validade}
+                      onChange={(e) => {
+                        let value = e.target.value.replace(/\D/g, '');
+                        if (value.length >= 2) {
+                          value = value.slice(0, 2) + '/' + value.slice(2);
+                        }
+                        setCardData({ ...cardData, validade: value });
+                      }}
+                      placeholder="MM/AA"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="cvv" className="text-sm font-medium text-gray-900">
+                      CVV
+                    </label>
+                    <input
+                      type="text"
+                      id="cvv"
+                      maxLength={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      value={cardData.cvv}
+                      onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '') })}
+                      placeholder="123"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {cardError && (
+                <div className="text-red-500 text-sm text-center">
+                  {cardError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="text-center space-y-1">
+                  <p className="font-medium text-sm">Valor a pagar:</p>
+                  <p className="text-2xl font-bold text-orange-500">R$ {total.toFixed(2)}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="bg-white/80 hover:bg-white"
+                    onClick={() => setPaymentStep('method')}
+                  >
+                    Voltar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-medium"
+                    disabled={loading}
+                  >
+                    {loading ? 'Processando...' : 'Pagar Agora'}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
         </div>
       </DialogContent>
     </Dialog>
